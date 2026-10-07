@@ -1,7 +1,10 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
-const db = new Database(path.join(__dirname, '..', 'hamzawy.db'));
+// استخدام المجلد المؤقت /tmp لتسهيل الكتابة على Vercel
+const dbPath = process.env.VERCEL ? path.join('/tmp', 'hamzawy.db') : path.join(__dirname, '..', 'hamzawy.db');
+const db = new Database(dbPath);
 db.pragma('foreign_keys = ON');
 
 db.exec(`
@@ -78,6 +81,7 @@ CREATE TABLE IF NOT EXISTS balance_transactions (
 );
 `);
 
+// إضافة خدمات حمزاوي سات الافتراضية
 const count = db.prepare('SELECT COUNT(*) AS c FROM services').get().c;
 if (!count) {
   const insert = db.prepare('INSERT INTO services (name, description) VALUES (?, ?)');
@@ -86,12 +90,24 @@ if (!count) {
   insert.run('صيانة إضاءة LED للتلفزيون', 'تغيير وإصلاح شرائط LED لشاشات التلفزيون');
 }
 
+// إضافة إعدادات المحفظة
 const wallet = db.prepare('SELECT id FROM wallet_settings WHERE id=1').get();
 if (!wallet) {
   db.prepare(`
     INSERT INTO wallet_settings (id, provider, wallet_number, owner_name, instructions)
-    VALUES (1, 'Vodafone Cash', 'يتم تحديده من الأدمن', 'حمزاوي سات', 'حوّل المبلغ ثم ارفع صورة الإيصال من التطبيق.')
+    VALUES (1, 'Vodafone Cash', '01152822263', 'حمزاوي سات', 'حوّل المبلغ ثم ارفع صورة الإيصال من التطبيق.')
   `).run();
+}
+
+// إنشاء حساب الأدمن الافتراضي تلقائياً
+const adminExists = db.prepare("SELECT id FROM users WHERE role='admin'").get();
+if (!adminExists) {
+  const adminPhone = '01152822263';
+  const adminPasswordHash = bcrypt.hashSync('admin123', 10);
+  db.prepare(`
+    INSERT INTO users (name, phone, password_hash, role, approved)
+    VALUES ('الأدمن', ?, ?, 'admin', 1)
+  `).run(adminPhone, adminPasswordHash);
 }
 
 module.exports = db;
